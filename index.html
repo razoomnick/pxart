@@ -72,12 +72,12 @@
 	}
 	var result = '';
     for (var i = 0; i < data.length; i += 4){
+      if ((i > 0) && ((i / 4) % w == 0)){
+	    result += '\r\n'
+	  }
       var val = data[i] * 256 * 256 + data[i + 1] * 256 + data[i + 2];
       var number = colors[val];
 	  result += number;
-	  if ((i > 0) && ((i / 4) % w == 0)){
-	    result += '\r\n'
-	  }
 	}
 	return result;
   }
