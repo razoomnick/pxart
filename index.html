@@ -1,0 +1,86 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <title>Img to numbers converter</title>
+  <meta name="description" content="Img to numbers converter">
+  <meta name="author" content="Yury Loskat">
+
+</head>
+
+<body style='margin:20px;'>
+<div style='margin:10px 0 0 0;'>
+  <input type='file' accept='image/*' onchange='openFile(event)'>
+</div>
+<div style='margin:10px 0 0 0;'>
+  <img id='imgFile'>
+</div>
+<div style='margin:10px 0 0 0;'>
+  <textarea id='txtOutput' style='width:100%; box-sizing:border-box; white-space:nowrap; height:600px;'>
+  </textarea>
+</div>
+<script>
+  var img = document.getElementById('imgFile');
+  img.onload = function(){
+    fillTextarea();
+  }
+
+  var openFile = function(file) {
+    var input = file.target;
+	var reader = new FileReader();
+    reader.onload = function(){
+	  var img = document.getElementById('imgFile');
+      var dataURL = reader.result;
+      img.src = dataURL;
+    };
+    reader.readAsDataURL(input.files[0]);
+  };
+  
+  function fillTextarea(){
+  	var textarea = document.getElementById('txtOutput');
+	var text = convertImgToText(img);
+	textarea.innerHTML = text;
+  }
+  
+  function convertImgToText(){
+    var canvas = document.createElement('canvas');
+	var w = img.width;
+	var h = img.height;
+    canvas.width = w;
+    canvas.height = h;
+	var context = canvas.getContext('2d');
+    context.drawImage(img, 0, 0, w, h);
+	var data = context.getImageData(0, 0, w, h);
+	var text = convertDataToText(data.data, w);
+	return text;
+  }
+  
+  function convertDataToText(data, w){
+    var colors = {};
+    for (var i = 0; i < data.length; i += 4){
+      var val = data[i] * 256 * 256 + data[i + 1] * 256 + data[i + 2];
+      colors[val] = val;
+	}
+	var keys = Object.keys(colors);
+	if (keys.length > 10){
+	  return 'colors count is greater than 10';
+	}
+	for (var i = 0; i < keys.length; i++){
+	  colors[keys[i]] = i + '';
+	}
+	var result = '';
+    for (var i = 0; i < data.length; i += 4){
+      var val = data[i] * 256 * 256 + data[i + 1] * 256 + data[i + 2];
+      var number = colors[val];
+	  result += number;
+	  if ((i > 0) && ((i / 4) % w == 0)){
+	    result += '\r\n'
+	  }
+	}
+	return result;
+  }
+</script>
+</body>
+</html>
