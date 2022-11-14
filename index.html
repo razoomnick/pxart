@@ -17,21 +17,28 @@
 <div style='margin:10px 0 0 0;'>
   <img id='imgFile'>
 </div>
-<div style='margin:10px 0 0 0;'>
-  <textarea id='txtOutput' style='width:100%; box-sizing:border-box; white-space:nowrap; height:600px;'>
-  </textarea>
+<div style="display:table; margin:10px 0 0 0; width:100%;">
+  <div style='width:50%; display:table-cell; vertical-align:top; padding-right:20px;'>
+    <textarea id='txtOutput' style='width:100%; box-sizing:border-box; white-space:nowrap; height:600px; display:block'>
+    </textarea>
+  </div>
+  <div style='display:table-cell; vertical-align:top; padding-left:20px;'>
+    <div id='legend' style='margin-bottom:30px;'></div>
+	<canvas id='canvas'></canvas>
+  </div>
 </div>
 <script>
   var img = document.getElementById('imgFile');
   img.onload = function(){
     fillTextarea();
+    animate();
   }
 
   var openFile = function(file) {
     var input = file.target;
-	var reader = new FileReader();
+    var reader = new FileReader();
     reader.onload = function(){
-	  var img = document.getElementById('imgFile');
+      var img = document.getElementById('imgFile');
       var dataURL = reader.result;
       img.src = dataURL;
     };
@@ -39,47 +46,128 @@
   };
   
   function fillTextarea(){
-  	var textarea = document.getElementById('txtOutput');
-	var text = convertImgToText(img);
-	textarea.innerHTML = text;
+    var textarea = document.getElementById('txtOutput');
+    var convertedImage = convertImgToText(img);
+    textarea.innerHTML = convertedImage.text;
+	showLegend(convertedImage.colorCodes);
   }
   
   function convertImgToText(){
+    var w = img.width;
+    var data = getData();
+    var text = convertDataToText(data.data, w);
+    return text;
+  }
+  
+  function getData(){
     var canvas = document.createElement('canvas');
-	var w = img.width;
-	var h = img.height;
+    var w = img.width;
+    var h = img.height;
     canvas.width = w;
     canvas.height = h;
-	var context = canvas.getContext('2d');
+    var context = canvas.getContext('2d');
     context.drawImage(img, 0, 0, w, h);
-	var data = context.getImageData(0, 0, w, h);
-	var text = convertDataToText(data.data, w);
-	return text;
+    var data = context.getImageData(0, 0, w, h);
+    return data;
+  }
+  
+  function getCompareColorsFunction(colors){
+    return function (a, b){
+      var white = 255 * 256 * 256 + 255 * 256 + 255;
+      if (a == white){
+        return -1;
+      }
+      if (b == white){
+        return 1;
+      }
+      return colors[b] - colors[a];
+    }
   }
   
   function convertDataToText(data, w){
-    var colors = {};
-    for (var i = 0; i < data.length; i += 4){
-      var val = data[i] * 256 * 256 + data[i + 1] * 256 + data[i + 2];
-      colors[val] = val;
-	}
-	var keys = Object.keys(colors);
-	if (keys.length > 10){
-	  return 'colors count is greater than 10';
-	}
-	for (var i = 0; i < keys.length; i++){
-	  colors[keys[i]] = i + '';
-	}
+    var colorCodes = getColorCodes(data, w);
 	var result = '';
     for (var i = 0; i < data.length; i += 4){
       if ((i > 0) && ((i / 4) % w == 0)){
-	    result += '\r\n'
-	  }
+        result += '\r\n'
+      }
       var val = data[i] * 256 * 256 + data[i + 1] * 256 + data[i + 2];
-      var number = colors[val];
-	  result += number;
+      var number = colorCodes[val];
+      result += number + ' ';
+    }
+    return {text: result, colorCodes: colorCodes};
+  }
+  
+  function getColorCodes(data, w){
+    var colors = {};
+    for (var i = 0; i < data.length; i += 4){
+      var val = data[i] * 256 * 256 + data[i + 1] * 256 + data[i + 2];
+      colors[val] = (colors[val] || 0) + 1;
+    }
+    var compareColors = getCompareColorsFunction(colors);
+    var keys = Object.keys(colors).sort(compareColors);
+    if (keys.length > 10){
+      return 'colors count is greater than 10';
+    }
+    var colorCodes = {};
+    for (var i = 0; i < keys.length; i++){
+      colorCodes[keys[i]] = i;
+    }
+	return colorCodes;
+  }
+  
+  function showLegend(colorCodes){
+    var holder = document.getElementById('legend');
+	holder.innerHTML = '';
+	function compare(a, b){
+	  return colorCodes[a] - colorCodes[b];
 	}
-	return result;
+	var keys = Object.keys(colorCodes).sort(compare);
+	var html = '';
+	for (var i = 0; i < keys.length; i++){
+      var rgb = parseInt(keys[i]).toString(16).padStart(6, '0');
+	  html += '<div style="display: inline-block; margin-right:20px;"><div style=\'text-align:center; width:50px; height:50px; border:1px solid #000; display:inline-block; background-color:#'+ rgb + '\'>' + colorCodes[keys[i]] + '</div><div style=\'display:inline-block; padding-left:8px;\'>#' + rgb + '</div></div>';
+    }
+	holder.innerHTML = html;
+  }
+  
+  function animate(){
+    var data = getData();
+    var canvas = document.getElementById('canvas')
+    if (!canvas){
+	  canvas = document.createElement('canvas');
+	  canvas.setAttribute("id", "canvas");
+	  document.body.appendChild(canvas);
+	}
+    var w = img.width;
+    var h = img.height;
+    canvas.width = w * 50;
+    canvas.height = h * 50;
+    var context = canvas.getContext('2d');
+    
+    var getHandler = function(i, j){
+      return function(){
+        context.fillStyle = getColor(data, w, i, j);
+        context.fillRect(i * 50, j * 50, 50, 50);
+      }
+    };
+    
+    for (var i = 0; i < w; i ++){
+      for(var j = 0; j < h; j++){
+        var handler = getHandler(i, j);
+        setTimeout(handler, (i * h + j) * 10);
+      }
+    }
+  }
+  
+  function getColor(data, w, x, y){
+    var index = (y * w + x) * 4;
+    var r = data.data[index];
+    var g = data.data[index + 1];
+    var b = data.data[index + 2];
+    var a = data.data[index + 3];
+    var color = 'rgba(' + r + ', ' + g + ',' + b + ', ' + a +  ')';
+    return color;
   }
 </script>
 </body>
